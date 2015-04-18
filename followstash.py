@@ -39,16 +39,57 @@ class Followstash(object):
         self._unfollow(following)
 
     def _get_all_following(self):
-        pass
+        # This returns all following (at least when tested with 1797)
+        following_response = self.session.get('https://api.twitter.com/1.1/friends/ids.json')
+        following_response.raise_for_status()
+
+        following = following_response.json()
+        following = following['ids']
+        following = reversed(following)
+
+        return following
 
     def _get_list(self):
-        pass
+        lists_response = self.session.get('https://api.twitter.com/1.1/lists/list.json')
+        lists_response.raise_for_status()
 
-    def _add_to_list(self, following, list_):
-        pass
+        lists = lists_response.json()
+
+        for list_ in lists:
+            if list_['slug'] == 'followstash':
+                return list_['id']
+
+        # We couldn't find the list. Create it
+        list_create_response = self.session.post('https://api.twitter.com/1.1/lists/create.json?name=Followstash&mode=private')
+        list_create_response.raise_for_status()
+
+        list_ = list_create_response.json()
+
+        return list_['id']
+
+    def _add_to_list(self, following, list_name):
+        following = tuple(following)
+        groups = _groups(following)
+
+        for group in groups:
+            formatted_group = ','.join(map(str, group))
+
+            list_add_response = self.session.post('https://api.twitter.com/1.1/lists/members/create_all.json?list_id={}&user_id={}'.format(list_name, formatted_group))
+
+            try:
+                list_add_response.raise_for_status()
+            except:
+                print list_add_response.text
+                print list_add_response.headers
+                raise
 
     def _unfollow(self, following):
         pass
+
+
+def _groups(list_, group_size=100):
+    for i in xrange(0, len(list_), group_size):
+        yield list_[i:i + group_size]
 
 
 if __name__ == '__main__':
